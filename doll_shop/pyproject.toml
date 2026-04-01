@@ -1,0 +1,22 @@
+[project]
+name = "doll-shop-apis"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pyjwt[crypto]",
+    "pydantic-settings",
+    "requests",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "psycopg2-binary",
+    "httpx>=0.28.1",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-cov",
+]

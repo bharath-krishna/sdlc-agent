@@ -10,7 +10,6 @@ wheels/
 .venv
 .
 .env.local
-doll_shop
 agents
 agents/.adk
 .env

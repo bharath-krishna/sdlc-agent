@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: doll-shop-ingress
+spec:
+  rules:
+  - host: dollshop.krishb.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: doll-shop-api
+            port:
+              number: 80
