@@ -1,0 +1,15 @@
+[project]
+name = "sdlc-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "google-adk>=1.28.0",
+    "ipdb>=0.13.13",
+    "litellm>=1.80.9",
+    "pymilvus>=2.6.11",
+    "opik>=1.10.1",
+    "langfuse==3.10.5",
+    "openinference-instrumentation-google-adk>=0.1.7",
+]
