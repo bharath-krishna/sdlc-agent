@@ -28,7 +28,7 @@ def test_milvus_connection():
 
     # Create test collections
     try:
-        for i in range(3):
+        for i in range(3, 6):
             collection_name = f"test_collection_{i}"
             
             # Check if collection exists, drop if it does
