@@ -128,7 +128,27 @@ dependencies = [
 ```
 
 After running `uv add` or `uv remove`, both `pyproject.toml` and `uv.lock`
-are updated automatically. Commit both files.
+are updated automatically. **Commit both files immediately:**
+
+```bash
+git add pyproject.toml uv.lock
+git commit -m "chore: update dependencies with uv add <package>"
+```
+
+---
+
+## Version Control Setup
+
+**🔥 Initialize git immediately after creating the project:**
+
+```bash
+# After creating your project and running initial setup
+git init
+git add -A
+git commit -m "Initial project setup with uv dependencies"
+```
+
+This establishes your project history before any development begins. Do not skip this step.
 
 ---
 
@@ -452,6 +472,26 @@ target_metadata = Base.metadata
 Every schema file added to `api/schemas/` must have a corresponding import
 here. Without it, autogenerate will not see the new table and will not generate
 the migration.
+
+### Step 7 — Commit your feature
+
+After completing all 6 steps above, commit your work:
+
+```bash
+git add -A
+git commit -m "Feature: Add <feature> CRUD endpoints
+
+- Add <feature> schema in api/schemas/<feature>.py
+- Add <feature> models in api/models/<feature>.py
+- Add <feature> business logic in api/modules/<feature>.py
+- Add <feature> routes in api/routers/<feature>.py
+- Register <feature> router in api/main.py
+- Register <feature> schema in alembic/env.py
+- Add migration in alembic/versions/
+- Add e2e tests in tests/e2e/<feature>/test_<feature>.py"
+```
+
+Committing after each feature keeps your history clean and enables easy rollback if needed.
 
 ---
 
@@ -862,3 +902,7 @@ Test cases to cover:
 Additional notes:
   -
 ```
+
+Build a doll shop backend apis including crud operations for common features, like listing/filtering dolls based on price, category, material, size, weight etc.
+
+order placemement, purchase history of the user, user filtering (include common user/customer details).

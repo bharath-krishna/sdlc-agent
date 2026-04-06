@@ -1,22 +1,17 @@
 [project]
-name = "doll-shop-apis"
+name = "doll-shop"
 version = "0.1.0"
-requires-python = ">=3.10"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
 dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
-    "pyjwt[crypto]",
-    "pydantic-settings",
-    "requests",
-    "sqlalchemy[asyncio]",
-    "asyncpg",
-    "alembic",
-    "psycopg2-binary",
-    "httpx>=0.28.1",
-]
-
-[tool.uv]
-dev-dependencies = [
-    "pytest",
-    "pytest-cov",
+    "asyncpg>=0.31.0",
+    "fastapi>=0.135.2",
+    "passlib[bcrypt]>=1.7.4",
+    "python-dotenv>=1.2.2",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart>=0.0.22",
+    "pydantic-settings>=2.0.0",
+    "sqlalchemy>=2.0.48",
+    "uvicorn>=0.42.0",
 ]

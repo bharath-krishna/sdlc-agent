@@ -1,29 +1,32 @@
-# Use a Python base image
-FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
+# Use official Python slim image
+FROM python:3.14-slim
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
-# Enable bytecode compilation
-ENV UV_COMPILE_BYTECODE=1
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy from the cache instead of linking since it's a container
-ENV UV_LINK_MODE=copy
+# Copy pyproject.toml and setup files
+COPY pyproject.toml ./
 
-# Install dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-dev
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
 
-# Copy the application code
-COPY . .
+# Copy application code
+COPY app/ ./app/
+COPY main.py ./
 
-# Expose the port
-EXPOSE 9999
+# Create a non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
-# Make entrypoint script executable
-RUN chmod +x entrypoint.sh
+# Expose the application port
+EXPOSE 8000
 
-# Command to run the application
-ENTRYPOINT ["./entrypoint.sh"]
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

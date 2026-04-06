@@ -27,7 +27,7 @@ import os
 
 # Configure model based on USE_LITELLM setting
 use_litellm = os.getenv("USE_LITELLM", "false").lower() == "true"
-model_name = os.getenv("MODEL_NAME", "gemini-3-flash-preview")
+model_name = os.getenv("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M")
 
 if use_litellm:
     # Use LiteLLM for multi-model support (google_search won't work)
@@ -43,54 +43,36 @@ else:
     print(f"Using native Gemini model: {model_name}")
 
 repo_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "gemini-3-flash-preview"),
+    model=os.environ.get("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M"),
     name='repo_agent',
     description="""
     An agent that inspects the code repository to provide insights about
     the project structure, architecture, and codebase organization.
+    This agent is read-only and cannot modify files or execute code.
     """,
     instruction="""
-    You are a repository analyzer. Your task is to:
-    1. Call the tools to retrieve the contents of README.md and AGENTS.md files from the repository.
-    
-    Use the information gathered to provide actionable insights about the codebase.
+    You are a repository analyzer with read-only access. Your task is to:
+    1. Use the filesystem tools to inspect the repository structure.
+    2. Retrieve the contents of README.md and AGENTS.md if they exist.
+    3. Provide actionable insights about the project structure, architecture, and codebase organization.
+    4. Do not write to files, do not execute code, and do not attempt to make changes.
     """,
     tools=[
         get_filesystem_toolset(tool_filter=["read_text_file", "list_directory", "directory_tree"])
     ],
     output_key='repo_insights',
+    generate_content_config=types.GenerateContentConfig(
+        # temperature=0.2, # More deterministic output
+        max_output_tokens=2500,
+        http_options=types.HttpOptions(
+            timeout=600000  # 10 minutes
+        )
+    )
 )
 
-
-change_planner_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "gemini-3-flash-preview"),
-    name='change_planner_agent',
-    description="This agent analyzes the repository structure and identifies the exact files, modules, and codebase areas that need to be modified. It provides a high-level overview and precursor plan for the plan_writer_agent to expand upon.",
-    instruction="""
-    You are a change planning analyst. Based on the repo insights provided, your task is to:
-    1. Identify the exact files and modules that need to be modified
-    2. Map out the codebase areas that will be affected by the changes
-    3. Analyze dependencies and relationships between components
-    4. Create a high-level precursor plan with:
-       - List of files/modules to modify (with file paths)
-       - Component relationships and dependencies
-       - Impact analysis of proposed changes
-       - Priority order for modifications
-       - Key considerations and constraints
-    
-    This precursor plan will be used by the plan_writer_agent to create detailed implementation steps.
-    
-    repo_insights:
-    {{repo_insights}}
-    """,
-    tools=[],
-    output_key='files_to_modify',
-)
-
-
-plan_writer_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "gemini-3-flash-preview"),
-    name='plan_writer_agent',
+planer_agent = LlmAgent(
+    model=os.environ.get("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M"),
+    name='planer_agent',
     description="""
     An agent that takes the change plan created by the change_planner_agent and writes a detailed
     implementation plan.
@@ -98,16 +80,26 @@ plan_writer_agent = LlmAgent(
     instruction="""
     The implementation plan should include specific instructions for each task in the change plan, as well as any relevant code snippets or examples.
     Files to modify:
-    {{files_to_modify}}
+    {{repo_insights}}
     """,
     output_key='implementation_plan',
+    tools=[
+        get_filesystem_toolset(tool_filter=["read_text_file", "list_directory", "directory_tree"])
+    ],
+    generate_content_config=types.GenerateContentConfig(
+        # temperature=0.2, # More deterministic output
+        max_output_tokens=2500,
+        http_options=types.HttpOptions(
+            timeout=600000  # 10 minutes
+        )
+    )
 )
 
 revisor_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "gemini-3-flash-preview"),
+    model=os.environ.get("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M"),
     name='revisor_agent',
     description="""
-    An agent that reviews the implementation plan created by the plan_writer_agent and evaluates it against the original user intent. It provides constructive critique and actionable feedback to ensure the plan effectively addresses the user's requirements.
+    An agent that reviews the implementation plan created by the planer_agent and evaluates it against the original user intent. It provides constructive critique and actionable feedback to ensure the plan effectively addresses the user's requirements.
     """,
     instruction="""
     You are an implementation plan reviewer. Your task is to:
@@ -130,6 +122,13 @@ revisor_agent = LlmAgent(
         get_filesystem_toolset(tool_filter=["read_text_file", "list_directory", "directory_tree"])
     ],
     output_key='revised_plan',
+    generate_content_config=types.GenerateContentConfig(
+        # temperature=0.2, # More deterministic output
+        max_output_tokens=2500,
+        http_options=types.HttpOptions(
+            timeout=600000  # 10 minutes
+        )
+    )
 )
 
 
@@ -137,16 +136,14 @@ class PlannerAgent(BaseAgent):
     name: str = "planner_agent"
     description: str = "An agent that orchestrates the planning process for project repository modifications."
     repo_agent: LlmAgent
-    change_planner_agent: LlmAgent
-    plan_writer_agent: LlmAgent
+    planer_agent: LlmAgent
     revisor_agent: LlmAgent
     sequential_agent: SequentialAgent
 
     def __init__(
             self,
             repo_agent: LlmAgent,
-            change_planner_agent: LlmAgent,
-            plan_writer_agent: LlmAgent,
+            planer_agent: LlmAgent,
             revisor_agent: LlmAgent,
             sequential_agent: Optional[SequentialAgent] = None
         ):
@@ -156,8 +153,7 @@ class PlannerAgent(BaseAgent):
             description="A sequential agent that orchestrates the repo analysis, change planning, plan writing, and revision process.",
             sub_agents=[
                 repo_agent,
-                change_planner_agent,
-                plan_writer_agent,
+                planer_agent,
                 revisor_agent,
             ],
         )
@@ -165,8 +161,7 @@ class PlannerAgent(BaseAgent):
         super().__init__(
             name="planner_agent",
             repo_agent=repo_agent,
-            change_planner_agent=change_planner_agent,
-            plan_writer_agent=plan_writer_agent,
+            planer_agent=planer_agent,
             revisor_agent=revisor_agent,
             sequential_agent=sequential_agent
         )
@@ -179,7 +174,6 @@ class PlannerAgent(BaseAgent):
 
 planner_agent = PlannerAgent(
     repo_agent=repo_agent,
-    change_planner_agent=change_planner_agent,
-    plan_writer_agent=plan_writer_agent,
+    planer_agent=planer_agent,
     revisor_agent=revisor_agent,
 )

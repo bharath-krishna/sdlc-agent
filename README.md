@@ -50,7 +50,7 @@ The agents communicate asynchronously through a LoopAgent orchestrator, enabling
 Analyzes the repository and creates a detailed implementation plan:
 - **repo_agent**: Inspects README.md, AGENTS.md, and project structure
 - **change_planner_agent**: Identifies files to modify and impact analysis
-- **plan_writer_agent**: Generates detailed step-by-step implementation plan
+- **planer_agent**: Generates detailed step-by-step implementation plan
 - **revisor_agent**: Validates plan feasibility and refines recommendations
 
 #### Developer Agent
