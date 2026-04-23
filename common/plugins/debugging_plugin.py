@@ -8,6 +8,7 @@ from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 
 from typing import Dict, Any, Optional
+import datetime
 
 
 class DebuggingPlugin(BasePlugin):
@@ -34,22 +35,30 @@ class DebuggingPlugin(BasePlugin):
     ) -> None:
         """Log before LLM request."""
         print(f"\n[DEBUG] LLM request starting")
-        print(f"  Model: {llm_request.model}")
-        print(f"  Agent: {callback_context.agent_name}")
-        if llm_request.config.system_instruction:
-            instr = llm_request.config.system_instruction
-            instr_text = instr if isinstance(instr, str) else getattr(instr, 'text', str(instr)[:100])
-            print(f"  System instruction (first 100 chars): {str(instr_text)[:100]}")
+        # print(f"  Model: {llm_request.model}")
+        # print(f"  Agent: {callback_context.agent_name}")
+        # if llm_request.config.system_instruction:
+        #     instr = llm_request.config.system_instruction
+        #     print(f"  System instruction: {instr}")
+
+        # Inject environment context into system instruction
+        now = datetime.datetime.now().astimezone()
+        tz_abbr = now.strftime("%Z")  # e.g. IST
+        utc_offset = now.strftime("%z")  # e.g. +0530
+        utc_offset_fmt = f"UTC{utc_offset[:3]}:{utc_offset[3:]}"  # UTC+05:30
+
+        env_context = (
+            f"## Runtime Environment\n"
+            f"- Date: {now.strftime('%Y-%m-%d')}\n"
+            f"- Time: {now.strftime('%H:%M:%S')} {tz_abbr} ({utc_offset_fmt})"
+        )
+        llm_request.append_instructions([env_context])
 
     async def after_model_callback(
         self, *, callback_context: CallbackContext, llm_response: LlmResponse
     ) -> Optional[LlmResponse]:
         """Log after LLM response."""
         print(f"\n[DEBUG] LLM response received")
-        if llm_response.usage_metadata:
-            print(f"  Input tokens: {llm_response.usage_metadata.input_token_count}")
-            print(f"  Output tokens: {llm_response.usage_metadata.output_token_count}")
-            print(f"  Total tokens: {llm_response.usage_metadata.total_token_count}")
         return llm_response
 
     async def before_tool_callback(
@@ -66,7 +75,4 @@ class DebuggingPlugin(BasePlugin):
     ) -> Optional[dict]:
         """Log after tool execution."""
         print(f"\n[DEBUG] Tool '{tool.name}' completed")
-        if result:
-            result_keys = list(result.keys()) if isinstance(result, dict) else 'not a dict'
-            print(f"  Result keys: {result_keys}")
         return None

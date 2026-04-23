@@ -12,10 +12,13 @@ from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from typing import AsyncGenerator, Optional
-from common.tools import filesystem_toolset, get_documentation_files, readonly_filesystem_toolset, get_filesystem_toolset
 from google.adk.tools.mcp_tool import McpToolset, StdioConnectionParams, StreamableHTTPConnectionParams
 from google.adk.agents.context_cache_config import ContextCacheConfig
 from pydantic import BaseModel
+from google.adk.environment import LocalEnvironment
+from google.adk.tools.environment import EnvironmentToolset
+
+from common.custom_agents.custom_agent import CustomAgent
 
 
 import logging
@@ -27,7 +30,7 @@ import os
 
 # Configure model based on USE_LITELLM setting
 use_litellm = os.getenv("USE_LITELLM", "false").lower() == "true"
-model_name = os.getenv("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M")
+model_name = os.getenv("MODEL_NAME", "openai/gemma4-26b-uncensored")
 
 if use_litellm:
     # Use LiteLLM for multi-model support (google_search won't work)
@@ -42,8 +45,7 @@ else:
     model = model_name
     print(f"Using native Gemini model: {model_name}")
 
-repo_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M"),
+repo_agent = CustomAgent(
     name='repo_agent',
     description="""
     An agent that inspects the code repository to provide insights about
@@ -57,21 +59,22 @@ repo_agent = LlmAgent(
     3. Provide actionable insights about the project structure, architecture, and codebase organization.
     4. Do not write to files, do not execute code, and do not attempt to make changes.
     """,
-    tools=[
-        get_filesystem_toolset(tool_filter=["read_text_file", "list_directory", "directory_tree"])
-    ],
+    tools=[EnvironmentToolset(
+            environment=LocalEnvironment(
+                working_dir=os.environ.get("PROJECT_ROOT", "/home/bharath/workspace/agent-playground/doll_shop")
+            ),
+        )],
     output_key='repo_insights',
-    generate_content_config=types.GenerateContentConfig(
-        # temperature=0.2, # More deterministic output
-        max_output_tokens=2500,
-        http_options=types.HttpOptions(
-            timeout=600000  # 10 minutes
-        )
-    )
+    # generate_content_config=types.GenerateContentConfig(
+    #     # temperature=0.2, # More deterministic output
+    #     max_output_tokens=2500,
+    #     http_options=types.HttpOptions(
+    #         timeout=600000  # 10 minutes
+    #     )
+    # )
 )
 
-planer_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M"),
+planer_agent = CustomAgent(
     name='planer_agent',
     description="""
     An agent that takes the change plan created by the change_planner_agent and writes a detailed
@@ -83,20 +86,21 @@ planer_agent = LlmAgent(
     {{repo_insights}}
     """,
     output_key='implementation_plan',
-    tools=[
-        get_filesystem_toolset(tool_filter=["read_text_file", "list_directory", "directory_tree"])
-    ],
-    generate_content_config=types.GenerateContentConfig(
-        # temperature=0.2, # More deterministic output
-        max_output_tokens=2500,
-        http_options=types.HttpOptions(
-            timeout=600000  # 10 minutes
-        )
-    )
+    tools=[EnvironmentToolset(
+        environment=LocalEnvironment(
+            working_dir=os.environ.get("PROJECT_ROOT", "/home/bharath/workspace/agent-playground/doll_shop")
+        ),
+    )],
+    # generate_content_config=types.GenerateContentConfig(
+    #     # temperature=0.2, # More deterministic output
+    #     max_output_tokens=2500,
+    #     http_options=types.HttpOptions(
+    #         timeout=600000  # 10 minutes
+    #     )
+    # )
 )
 
-revisor_agent = LlmAgent(
-    model=os.environ.get("MODEL_NAME", "openai/qwen3-coder-next:q4_K_M"),
+revisor_agent = CustomAgent(
     name='revisor_agent',
     description="""
     An agent that reviews the implementation plan created by the planer_agent and evaluates it against the original user intent. It provides constructive critique and actionable feedback to ensure the plan effectively addresses the user's requirements.
@@ -118,18 +122,21 @@ revisor_agent = LlmAgent(
     implementation_plan:
     {{implementation_plan}}
     """,
-    tools=[
-        get_filesystem_toolset(tool_filter=["read_text_file", "list_directory", "directory_tree"])
-    ],
+    tools=[EnvironmentToolset(
+            environment=LocalEnvironment(
+                working_dir=os.environ.get("PROJECT_ROOT", "/home/bharath/workspace/agent-playground/doll_shop")
+            ),
+        )],
     output_key='revised_plan',
-    generate_content_config=types.GenerateContentConfig(
-        # temperature=0.2, # More deterministic output
-        max_output_tokens=2500,
-        http_options=types.HttpOptions(
-            timeout=600000  # 10 minutes
-        )
-    )
+    # generate_content_config=types.GenerateContentConfig(
+    #     # temperature=0.2, # More deterministic output
+    #     max_output_tokens=2500,
+    #     http_options=types.HttpOptions(
+    #         timeout=600000  # 10 minutes
+    #     )
+    # )
 )
+from typing import override
 
 
 class PlannerAgent(BaseAgent):
@@ -145,7 +152,6 @@ class PlannerAgent(BaseAgent):
             repo_agent: LlmAgent,
             planer_agent: LlmAgent,
             revisor_agent: LlmAgent,
-            sequential_agent: Optional[SequentialAgent] = None
         ):
 
         sequential_agent = SequentialAgent(
@@ -163,11 +169,12 @@ class PlannerAgent(BaseAgent):
             repo_agent=repo_agent,
             planer_agent=planer_agent,
             revisor_agent=revisor_agent,
-            sequential_agent=sequential_agent
+            sequential_agent=sequential_agent,
         )
 
+    @override
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
-        # return super()._run_async_impl(ctx)
+        logger.info("Starting PlannerAgent execution.")
         async for event in self.sequential_agent.run_async(ctx):
             yield event
 
