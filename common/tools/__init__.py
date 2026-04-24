@@ -72,3 +72,5 @@ import shlex
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+
+from common.tools.skills import list_skills, get_skill

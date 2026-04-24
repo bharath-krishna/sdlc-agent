@@ -16,7 +16,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from typing import Optional
 from common.custom_agents.planner_agent import planner_agent
-from common.tools import memory_toolset, tavily_toolset
+from common.tools import memory_toolset, tavily_toolset, list_skills, get_skill
 from google.adk.tools.mcp_tool import McpToolset, StdioConnectionParams, StreamableHTTPConnectionParams
 from google.adk.agents.context_cache_config import ContextCacheConfig
 from pydantic import BaseModel
@@ -222,6 +222,8 @@ developer_agent = Agent(
     """,
     tools=[
         tavily_toolset,
+        list_skills,
+        get_skill,
         EnvironmentToolset(
             environment=LocalEnvironment(
                 working_dir=os.environ.get("PROJECT_ROOT", "/home/bharath/workspace/agent-playground/doll_shop")
